@@ -11,13 +11,24 @@ import (
 
 func RegisterRoutes(r *gin.Engine) {
 	db := config.InitDB()
-	repo := repositories.NewDatabaseRepository(db)
-	service := services.NewDatabaseService(repo)
-	controller := controllers.NewDatabaseController(service)
+
+	// Repositories
+	repoDB := repositories.NewDatabaseRepository(db)
+	repoScan := repositories.NewScanRepository(db)
+	repoRule := repositories.NewRuleRepository(db)
+
+	// Services
+	serviceDB := services.NewDatabaseService(repoDB)
+	serviceScan := services.NewScanService(repoScan, repoRule)
+
+	// Controllers
+	controllerDB := controllers.NewDatabaseController(serviceDB)
+	controllerScan := controllers.NewScanController(serviceScan, db)
 
 	v1 := r.Group("/api/v1")
 	{
 		v1.GET("/ping", controllers.Ping)
-		v1.POST("/databases", controller.CreateDatabase)
+		v1.POST("/database", controllerDB.CreateDatabase)
+		v1.POST("/database/scan/:id", controllerScan.ExecuteScan)
 	}
 }

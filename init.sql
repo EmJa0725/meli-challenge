@@ -29,3 +29,19 @@ CREATE TABLE scan_results (
     info_type VARCHAR(50) NOT NULL,
     FOREIGN KEY (scan_id) REFERENCES scan_history(id)
 );
+
+CREATE TABLE classification_rules (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    type_name VARCHAR(50) NOT NULL,
+    regex VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Initital rules insertion
+INSERT INTO classification_rules (type_name, regex) VALUES
+('EMAIL_ADDRESS', '(?i)email'),
+('USERNAME', '(?i)user(name)?'),
+('CREDIT_CARD_NUMBER', '(?i)(credit.*card|card.*number)'),
+('FIRST_NAME', '(?i)first.*name'),
+('LAST_NAME', '(?i)last.*name'),
+('IP_ADDRESS', '(?i)ip(_address)?');
