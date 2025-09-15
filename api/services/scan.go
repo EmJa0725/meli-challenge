@@ -10,6 +10,7 @@ import (
 
 type ScanService interface {
 	ExecuteScan(databaseID int64, externalDB *sql.DB) (int64, error)
+	GetScanResults(scanID int64) (map[string][]models.ScanResult, error)
 }
 
 type scanService struct {
@@ -87,4 +88,17 @@ func (s *scanService) ExecuteScan(databaseID int64, externalDB *sql.DB) (int64, 
 	}
 
 	return scanID, nil
+}
+
+func (s *scanService) GetScanResults(scanID int64) (map[string][]models.ScanResult, error) {
+	results, err := s.repoScan.GetResultsByScanID(scanID)
+	if err != nil {
+		return nil, err
+	}
+
+	grouped := make(map[string][]models.ScanResult)
+	for _, res := range results {
+		grouped[res.TableName] = append(grouped[res.TableName], res)
+	}
+	return grouped, nil
 }

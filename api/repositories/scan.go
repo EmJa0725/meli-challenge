@@ -8,6 +8,7 @@ import (
 type ScanRepository interface {
 	CreateHistory(databaseId int64) (int64, error)
 	SaveResult(scanID int64, result models.ScanResult) error
+	GetResultsByScanID(scanID int64) ([]models.ScanResult, error)
 }
 
 type scanRepository struct {
@@ -42,4 +43,22 @@ func (r *scanRepository) SaveResult(scanID int64, result models.ScanResult) erro
 
 	_, err = stmt.Exec(scanID, result.TableName, result.ColumnName, result.InfoType)
 	return err
+}
+
+func (r *scanRepository) GetResultsByScanID(scanID int64) ([]models.ScanResult, error) {
+	rows, err := r.conn.Query("SELECT table_name, column_name, info_type FROM scan_results WHERE scan_id = ?", scanID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []models.ScanResult
+	for rows.Next() {
+		var result models.ScanResult
+		if err := rows.Scan(&result.TableName, &result.ColumnName, &result.InfoType); err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
+	return results, nil
 }

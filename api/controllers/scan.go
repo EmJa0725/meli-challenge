@@ -11,12 +11,12 @@ import (
 )
 
 type ScanController struct {
-	service services.ScanService
+	Service services.ScanService
 	DB      *sql.DB // Connection to internal Database
 }
 
 func NewScanController(service services.ScanService, db *sql.DB) *ScanController {
-	return &ScanController{service: service, DB: db}
+	return &ScanController{Service: service, DB: db}
 }
 
 func (ctrl *ScanController) ExecuteScan(c *gin.Context) {
@@ -44,11 +44,33 @@ func (ctrl *ScanController) ExecuteScan(c *gin.Context) {
 	}
 	defer externalDB.Close()
 
-	scanID, err := ctrl.service.ExecuteScan(dbID, externalDB)
+	scanID, err := ctrl.Service.ExecuteScan(dbID, externalDB)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"scan_id": scanID})
+}
+
+func (ctrl *ScanController) GetScanResults(c *gin.Context) {
+	idParam := c.Param("id")
+	scanID, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	results, err := ctrl.Service.GetScanResults(scanID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(results) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"message": "no results for this scan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, results)
 }
