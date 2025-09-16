@@ -18,13 +18,13 @@ func NewDatabaseRepository(conn *sql.DB) DatabaseRepository {
 }
 
 func (r *databaseRepository) Create(dbConfig models.Database) (int64, error) {
-	stmt, err := r.conn.Prepare("INSERT INTO databases(host, port, username, password) VALUES(?, ?, ?, ?)")
+	stmt, err := r.conn.Prepare("INSERT INTO `external_databases` (`host`, `port`, `username`, `password`, `db_name`) VALUES(?, ?, ?, ?, ?)")
 	if err != nil {
 		return 0, err
 	}
 	defer stmt.Close()
 
-	result, err := stmt.Exec(dbConfig.Host, dbConfig.Port, dbConfig.Username, dbConfig.Password)
+	result, err := stmt.Exec(dbConfig.Host, dbConfig.Port, dbConfig.Username, dbConfig.Password, dbConfig.DBName)
 	if err != nil {
 		return 0, err
 	}

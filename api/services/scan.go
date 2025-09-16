@@ -10,6 +10,7 @@ import (
 
 type ScanService interface {
 	ExecuteScan(databaseID int64, externalDB *sql.DB) (int64, error)
+	UpdateScanStatus(scanID int64, status string) error
 	GetScanResults(scanID int64) (map[string][]models.ScanResult, error)
 }
 
@@ -22,38 +23,51 @@ func NewScanService(repoScan repositories.ScanRepository, repoRule repositories.
 	return &scanService{repoScan: repoScan, repoRule: repoRule}
 }
 
-func (s *scanService) ExecuteScan(databaseID int64, externalDB *sql.DB) (int64, error) {
+func (s *scanService) UpdateScanStatus(scanID int64, status string) error {
+	return s.repoScan.UpdateHistoryStatus(scanID, status)
+}
+
+func (s *scanService) ExecuteScan(databaseID int64, externalDB *sql.DB) (scanID int64, err error) {
 	// Crear historial
-	scanID, err := s.repoScan.CreateHistory(databaseID)
+	scanID, err = s.repoScan.CreateHistory(databaseID)
 	if err != nil {
 		return 0, err
 	}
 
+	// Ensure we update the status to success or failed depending on outcome
+	defer func() {
+		if err != nil {
+			_ = s.repoScan.UpdateHistoryStatus(scanID, "failed")
+			return
+		}
+		_ = s.repoScan.UpdateHistoryStatus(scanID, "success")
+	}()
+
 	// Obtener reglas desde DB interna
 	rules, err := s.repoRule.GetAllRules()
 	if err != nil {
-		return 0, err
+		return scanID, err
 	}
 
 	// Construir clasificadores dinámicos
 	classifiersList, err := classifiers.BuildClassifiers(rules)
 	if err != nil {
-		return 0, err
+		return scanID, err
 	}
 
 	// Listar tablas
 	tables, err := externalDB.Query("SHOW TABLES")
 	if err != nil {
-		return 0, err
+		return scanID, err
 	}
 	defer tables.Close()
 
 	for tables.Next() {
 		var tableName string
 		if err := tables.Scan(&tableName); err != nil {
-			return 0, err
+			return scanID, err
 		}
-
+		fmt.Printf("Scanning table: %s\n", tableName)
 		// Listar columnas
 		cols, err := externalDB.Query(fmt.Sprintf("SHOW COLUMNS FROM %s", tableName))
 		if err != nil {
@@ -61,9 +75,11 @@ func (s *scanService) ExecuteScan(databaseID int64, externalDB *sql.DB) (int64, 
 		}
 
 		for cols.Next() {
-			var field, colType, null, key, defaultVal, extra string
+			var field, colType, null, key, extra string
+			var defaultVal sql.NullString
+
 			if err := cols.Scan(&field, &colType, &null, &key, &defaultVal, &extra); err != nil {
-				return 0, err
+				return scanID, err
 			}
 
 			infoType := "N/A"
@@ -81,7 +97,7 @@ func (s *scanService) ExecuteScan(databaseID int64, externalDB *sql.DB) (int64, 
 			}
 
 			if err := s.repoScan.SaveResult(scanID, result); err != nil {
-				return 0, err
+				return scanID, err
 			}
 		}
 		cols.Close()

@@ -1,26 +1,29 @@
--- Crear base de datos
+-- init.sql
+-- Create database
 CREATE DATABASE IF NOT EXISTS classifier_db;
 USE classifier_db;
 
--- Tabla de bases registradas para escaneo
-CREATE TABLE databases (
+-- Table of registered databases for scanning
+CREATE TABLE `external_databases` (
     id INT AUTO_INCREMENT PRIMARY KEY,
     host VARCHAR(100) NOT NULL,
     port INT NOT NULL,
     username VARCHAR(50) NOT NULL,
     password VARCHAR(255) NOT NULL,
+    db_name VARCHAR(100) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Historial de ejecuciones de escaneos
+-- Scan executions history
 CREATE TABLE scan_history (
     id INT AUTO_INCREMENT PRIMARY KEY,
     database_id INT NOT NULL,
     executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (database_id) REFERENCES databases(id)
+    status VARCHAR(20) NOT NULL DEFAULT 'running',
+    FOREIGN KEY (database_id) REFERENCES `external_databases`(id)
 );
 
--- Resultados detallados por escaneo
+-- Detailed results per scan
 CREATE TABLE scan_results (
     id INT AUTO_INCREMENT PRIMARY KEY,
     scan_id INT NOT NULL,
@@ -37,7 +40,7 @@ CREATE TABLE classification_rules (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Initital rules insertion
+-- Initial rules insertion
 INSERT INTO classification_rules (type_name, regex) VALUES
 ('EMAIL_ADDRESS', '(?i)email'),
 ('USERNAME', '(?i)user(name)?'),

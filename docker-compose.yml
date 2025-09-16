@@ -20,11 +20,30 @@ services:
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASS}
+      MYSQL_TCP_PORT: ${DB_PORT}
     restart: always
     ports:
-      - "3306:3306"
+      - "${DB_PORT}:${DB_PORT}"
     volumes:
       - db_data:/var/lib/mysql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+  # Target data for testing
+  target_db:
+    image: mysql:8.0
+    hostname: meli-challenge-target-db
+    container_name: meli-challenge-target-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${TARGET_DB_ROOT_PASS}
+      MYSQL_DATABASE: ${TARGET_DB_NAME}
+      MYSQL_USER: ${TARGET_DB_USER}
+      MYSQL_PASSWORD: ${TARGET_DB_PASS}
+      MYSQL_TCP_PORT: ${TARGET_DB_PORT}
+    restart: always
+    ports:
+      - "${TARGET_DB_PORT}:${TARGET_DB_PORT}"
+    volumes:
+      - target_db_data:/var/lib/mysql
+      - ./init-target.sql:/docker-entrypoint-initdb.d/init.sql
 volumes:
   db_data:
+  target_db_data:

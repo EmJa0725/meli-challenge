@@ -28,25 +28,31 @@ func (ctrl *ScanController) ExecuteScan(c *gin.Context) {
 	}
 
 	// obtain database connection details from internal DB
-	row := ctrl.DB.QueryRow("SELECT host, port, username, password FROM databases WHERE id = ?", dbID)
-	var host, username, password string
+	row := ctrl.DB.QueryRow("SELECT host, port, username, password, db_name FROM `external_databases` WHERE id = ?", dbID)
+	var host, username, password, dbName string
 	var port int
-	if err := row.Scan(&host, &port, &username, &password); err != nil {
+	if err := row.Scan(&host, &port, &username, &password, &dbName); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Database not found"})
 		return
 	}
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", username, password, host, port, "information_schema")
+	if dbName == "" {
+		dbName = "information_schema"
+	}
+
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", username, password, host, port, dbName)
 	externalDB, err := sql.Open("mysql", dsn)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error1": err.Error()})
 		return
 	}
 	defer externalDB.Close()
 
 	scanID, err := ctrl.Service.ExecuteScan(dbID, externalDB)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		// Ensure scan history is marked as failed even if the error occurred before service updated it
+		_ = ctrl.Service.UpdateScanStatus(scanID, "failed")
+		c.JSON(http.StatusInternalServerError, gin.H{"error2": err.Error()})
 		return
 	}
 

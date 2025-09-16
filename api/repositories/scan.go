@@ -7,6 +7,7 @@ import (
 
 type ScanRepository interface {
 	CreateHistory(databaseId int64) (int64, error)
+	UpdateHistoryStatus(scanID int64, status string) error
 	SaveResult(scanID int64, result models.ScanResult) error
 	GetResultsByScanID(scanID int64) ([]models.ScanResult, error)
 }
@@ -20,18 +21,29 @@ func NewScanRepository(conn *sql.DB) ScanRepository {
 }
 
 func (r *scanRepository) CreateHistory(databaseId int64) (int64, error) {
-	stmt, err := r.conn.Prepare("INSERT INTO scan_history(database_id) VALUES(?)")
+	stmt, err := r.conn.Prepare("INSERT INTO scan_history(database_id, status) VALUES(?, ?)")
 	if err != nil {
 		return 0, err
 	}
 	defer stmt.Close()
 
-	result, err := stmt.Exec(databaseId)
+	result, err := stmt.Exec(databaseId, "running")
 	if err != nil {
 		return 0, err
 	}
 
 	return result.LastInsertId()
+}
+
+func (r *scanRepository) UpdateHistoryStatus(scanID int64, status string) error {
+	stmt, err := r.conn.Prepare("UPDATE scan_history SET status = ? WHERE id = ?")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(status, scanID)
+	return err
 }
 
 func (r *scanRepository) SaveResult(scanID int64, result models.ScanResult) error {
