@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"meli-challenge/api/services"
+	"meli-challenge/logger"
 	"net/http"
 	"strconv"
 
@@ -45,14 +46,18 @@ func (ctrl *ScanController) ExecuteScan(c *gin.Context) {
 	}
 	defer externalDB.Close()
 
+	logger.Infof("Starting scan for database id=%d host=%s port=%d", dbID, host, port)
+
 	// Execute scan; service will scan all non-system schemas by connecting to information_schema
 	scanID, err := ctrl.Service.ExecuteScan(dbID, externalDB)
 	if err != nil {
 		// Ensure scan history is marked as failed even if the error occurred before service updated it
 		_ = ctrl.Service.UpdateScanStatus(scanID, "failed")
+		logger.Errorf("Scan failed for database id=%d: %v", dbID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	logger.Infof("Scan completed for database id=%d scan_id=%d", dbID, scanID)
 
 	c.JSON(http.StatusCreated, gin.H{"scan_id": scanID})
 }

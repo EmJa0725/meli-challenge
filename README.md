@@ -8,7 +8,20 @@ Esta solución explora instancias MySQL externas, recorre esquemas y tablas, y c
 
 ## Diseño
 
-Se utiliza una base de datos relacional para garantizar integridad referencial, trazabilidad y facilidad de auditoría. El diseño sigue principios SOLID y emplea los patrones Repository y Factory para mantener la solución extensible y testeable. Las reglas de clasificación se gestionan dinámicamente desde la base de datos.
+La solución está pensada para entornos donde la trazabilidad, la auditoría y la consistencia son fundamentales. Por eso se eligió una base de datos relacional (MySQL), que permite modelar relaciones entre configuraciones, ejecuciones y resultados de escaneo mediante claves foráneas y consultas estructuradas. Esto facilita la generación de reportes, el seguimiento histórico y la integración con sistemas corporativos de cumplimiento y seguridad.
+
+El sistema es extensible: las reglas de clasificación se gestionan dinámicamente desde la base de datos, permitiendo agregar nuevos tipos de datos sensibles sin modificar el código. La arquitectura sigue principios SOLID, separando responsabilidades en capas (controladores, servicios, repositorios y clasificadores), lo que mejora la mantenibilidad y la testabilidad. Los patrones Repository y Factory aseguran que la lógica de negocio no dependa de detalles de almacenamiento ni de la implementación de los clasificadores.
+
+Además, la solución es robusta ante errores: cada ejecución de escaneo queda registrada con su estado, permitiendo identificar fallos y mantener la trazabilidad. El diseño está alineado con prácticas de desarrollo profesional y preparado para evolucionar, integrarse en pipelines de auditoría y adaptarse a nuevos requisitos de negocio o seguridad.
+
+## Componentes principales
+
+El proyecto está organizado en capas para facilitar la mantenibilidad y la claridad:
+
+- **Controladores**: gestionan las peticiones HTTP y exponen los endpoints de la API.
+- **Servicios**: contienen la lógica de negocio, orquestan el flujo de escaneo y clasificación.
+- **Repositorios**: manejan el acceso a la base de datos y la persistencia de información.
+- **Clasificadores**: implementan la lógica para identificar tipos de datos sensibles usando reglas dinámicas.
 
 ## Cómo ejecutar el proyecto
 
@@ -19,7 +32,7 @@ Se utiliza una base de datos relacional para garantizar integridad referencial, 
 docker-compose up --build -d
 ```
 
-Una vez levantado, puedes realizar peticiones a los endpoints según el puerto definido en `.env`. Por ejemplo localhost:8000.
+Una vez levantado, se pueden realizar peticiones a los endpoints según el puerto definido en `.env`. Por ejemplo http://localhost:8000.
 
 ## Endpoints principales
 
@@ -122,6 +135,17 @@ Los tests unitarios están implementados en Testify y cubren la lógica principa
 ```bash
 go test ./... -v
 ```
+
+## Logging
+
+La aplicación incluye un logger que escribe a stdout. Controla el nivel de detalle con la variable de entorno `LOG_LEVEL` (valores: `DEBUG`, `INFO`, `WARN`, `ERROR`). Por defecto el nivel es `INFO`. Los logs aparecen en la salida estándar y contienen timestamp y nivel, por ejemplo:
+
+```
+[INFO] Scanning: target_sample_db.users
+[ERROR] SaveResult exec failed for scanID=1: <error>
+```
+
+Para ver logs más verbosos, exporta `LOG_LEVEL=DEBUG` antes de levantar los servicios.
 
 ## Modelo de datos
 

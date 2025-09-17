@@ -2,10 +2,10 @@ package services
 
 import (
 	"database/sql"
-	"fmt"
 	"meli-challenge/api/classifiers"
 	"meli-challenge/api/models"
 	"meli-challenge/api/repositories"
+	"meli-challenge/logger"
 )
 
 type ScanService interface {
@@ -74,7 +74,16 @@ func (s *scanService) ExecuteScan(databaseID int64, externalDB *sql.DB) (scanID 
 		if err := tablesRows.Scan(&schemaName, &tableName); err != nil {
 			return scanID, err
 		}
-		fmt.Printf("Scanning: %s.%s\n", schemaName, tableName)
+		// log scanning progress
+		// ...existing code...
+
+		// Use package logger for structured logs
+		// ...existing code...
+
+		// log scanning progress
+		// logger is imported at top
+
+		logger.Infof("Scanning: %s.%s", schemaName, tableName)
 
 		// Get columns for the specific schema.table
 		cols, err := externalDB.Query(`
