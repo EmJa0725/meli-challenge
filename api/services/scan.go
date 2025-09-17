@@ -9,8 +9,8 @@ import (
 )
 
 type ScanService interface {
-	// ExecuteScan scans either a specific schema (targetDBName != "") or all non-system schemas (targetDBName == "" or "information_schema")
-	ExecuteScan(databaseID int64, externalDB *sql.DB, targetDBName string) (int64, error)
+	// ExecuteScan scans all non-system schemas on the provided server instance
+	ExecuteScan(databaseID int64, externalDB *sql.DB) (int64, error)
 	UpdateScanStatus(scanID int64, status string) error
 	// GetScanResults returns a nested structure grouped by schema -> table -> columns
 	GetScanResults(scanID int64) (models.DatabaseResult, error)
@@ -29,7 +29,7 @@ func (s *scanService) UpdateScanStatus(scanID int64, status string) error {
 	return s.repoScan.UpdateHistoryStatus(scanID, status)
 }
 
-func (s *scanService) ExecuteScan(databaseID int64, externalDB *sql.DB, targetDBName string) (scanID int64, err error) {
+func (s *scanService) ExecuteScan(databaseID int64, externalDB *sql.DB) (scanID int64, err error) {
 	// Create history record (status = running)
 	scanID, err = s.repoScan.CreateHistory(databaseID)
 	if err != nil {
@@ -57,24 +57,13 @@ func (s *scanService) ExecuteScan(databaseID int64, externalDB *sql.DB, targetDB
 		return scanID, err
 	}
 
-	// Determine tables to scan:
-	// - if targetDBName is empty or "information_schema" -> scan all non-system schemas
-	// - otherwise scan only the provided schema
-	var tablesRows *sql.Rows
-	if targetDBName == "" || targetDBName == "information_schema" {
-		tablesRows, err = externalDB.Query(`
-			SELECT TABLE_SCHEMA, TABLE_NAME
-			FROM information_schema.tables
-			WHERE TABLE_TYPE='BASE TABLE'
-			  AND TABLE_SCHEMA NOT IN ('mysql','sys','information_schema','performance_schema')
-		`)
-	} else {
-		tablesRows, err = externalDB.Query(`
-			SELECT TABLE_SCHEMA, TABLE_NAME
-			FROM information_schema.tables
-			WHERE TABLE_TYPE='BASE TABLE' AND TABLE_SCHEMA = ?
-		`, targetDBName)
-	}
+	// Determine tables to scan: scan all non-system schemas
+	tablesRows, err := externalDB.Query(`
+		SELECT TABLE_SCHEMA, TABLE_NAME
+		FROM information_schema.tables
+		WHERE TABLE_TYPE='BASE TABLE'
+		  AND TABLE_SCHEMA NOT IN ('mysql','sys','information_schema','performance_schema')
+	`)
 	if err != nil {
 		return scanID, err
 	}

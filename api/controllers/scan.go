@@ -28,10 +28,10 @@ func (ctrl *ScanController) ExecuteScan(c *gin.Context) {
 	}
 
 	// obtain database connection details from internal DB
-	row := ctrl.DB.QueryRow("SELECT host, port, username, password, db_name FROM `external_databases` WHERE id = ?", dbID)
-	var host, username, password, dbName string
+	row := ctrl.DB.QueryRow("SELECT host, port, username, password FROM `external_databases` WHERE id = ?", dbID)
+	var host, username, password string
 	var port int
-	if err := row.Scan(&host, &port, &username, &password, &dbName); err != nil {
+	if err := row.Scan(&host, &port, &username, &password); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Database not found"})
 		return
 	}
@@ -45,8 +45,8 @@ func (ctrl *ScanController) ExecuteScan(c *gin.Context) {
 	}
 	defer externalDB.Close()
 
-	// Execute scan; pass dbName (if empty or "information_schema" service will scan all non-system schemas)
-	scanID, err := ctrl.Service.ExecuteScan(dbID, externalDB, dbName)
+	// Execute scan; service will scan all non-system schemas by connecting to information_schema
+	scanID, err := ctrl.Service.ExecuteScan(dbID, externalDB)
 	if err != nil {
 		// Ensure scan history is marked as failed even if the error occurred before service updated it
 		_ = ctrl.Service.UpdateScanStatus(scanID, "failed")

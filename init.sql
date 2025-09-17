@@ -10,7 +10,6 @@ CREATE TABLE `external_databases` (
     port INT NOT NULL,
     username VARCHAR(50) NOT NULL,
     password VARCHAR(255) NOT NULL,
-    db_name VARCHAR(100) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -44,26 +43,31 @@ CREATE TABLE classification_rules (
 -- Initial rules insertion
 INSERT INTO classification_rules (type_name, regex) VALUES
 -- Personal Information (PII)
-('FIRST_NAME', '(?i)^first[_ ]?name$'),
-('LAST_NAME', '(?i)^last[_ ]?name$'),
-('DATE_OF_BIRTH', '(?i)dob|date[_ ]?of[_ ]?birth|birth[_ ]?date'),
-('GENDER', '(?i)^gender$|^sex$'),
-('SSN', '(?i)(ssn|social[_ ]?security[_ ]?number|national[_ ]?id)'),
+('FIRST_NAME', '(?i)^first(_?name)?$'),
+('LAST_NAME', '(?i)^last(_?name)?$'),
+('DATE_OF_BIRTH', '(?i)^(dob|date[_ ]?of[_ ]?birth|birth[_ ]?date)$'),
+('GENDER', '(?i)^(gender|sex)$'),
+('SSN', '(?i)^(ssn|social[_ ]?security[_ ]?number|national[_ ]?id)$'),
+
 -- Contact Information
 ('EMAIL_ADDRESS', '(?i)email'),
-('PHONE_NUMBER', '(?i)phone|mobile|contact[_ ]?number'),
-('ADDRESS', '(?i)address|street|city|state|zip|postal[_ ]?code|country'),
+('PHONE_NUMBER', '(?i)^(phone|mobile|contact[_ ]?number)$'),
+('ADDRESS', '(?i)^address(_.*)?$'),
+('POSTAL_CODE', '(?i)^(postal|zip)_?code$'),
+
 -- Authentication / Security Data
-('USERNAME', '(?i)user(name)?'),
-('PASSWORD', '(?i)password|passcode|pwd'),
-('SECURITY_QUESTION', '(?i)security[_ ]?(question|answer)'),
-('API_KEY', '(?i)(api[_ ]?key|auth[_ ]?token|secret)'),
+('USERNAME', '(?i)^user(name)?$'),
+('PASSWORD', '(?i)^password$'),
+('SECURITY_QUESTION', '(?i)^security[_ ]?(question|answer)$'),
+('API_KEY', '(?i)^(api[_ ]?key|auth[_ ]?token|secret)$'),
+
 -- Financial Information (PCI)
-('CREDIT_CARD_NUMBER', '(?i)(credit.*card|card.*number)'),
-('BANK_ACCOUNT', '(?i)(account[_ ]?number|iban|acct)'),
-('ROUTING_NUMBER', '(?i)routing[_ ]?number'),
-('SWIFT_CODE', '(?i)swift[_ ]?code'),
+('CREDIT_CARD_NUMBER', '(?i)^(credit[_ ]?card(_?number)?|card[_ ]?number)$'),
+('BANK_ACCOUNT', '(?i)^(account[_ ]?number|iban|acct)$'),
+('ROUTING_NUMBER', '(?i)^routing[_ ]?number$'),
+('SWIFT_CODE', '(?i)^swift[_ ]?code$'),
+
 -- Technical Identifiers
 ('IP_ADDRESS', '(?i)^ip(_address)?$'),
-('MAC_ADDRESS', '(?i)mac[_ ]?address'),
-('HOSTNAME', '(?i)host[_ ]?name');
+('MAC_ADDRESS', '(?i)^mac[_ ]?address$'),
+('HOSTNAME', '(?i)^host[_ ]?name$');
