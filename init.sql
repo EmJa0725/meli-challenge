@@ -23,10 +23,11 @@ CREATE TABLE scan_history (
     FOREIGN KEY (database_id) REFERENCES `external_databases`(id)
 );
 
--- Detailed results per scan
+-- Detailed results per scan (now includes schema_name)
 CREATE TABLE scan_results (
     id INT AUTO_INCREMENT PRIMARY KEY,
     scan_id INT NOT NULL,
+    schema_name VARCHAR(100) NOT NULL,
     table_name VARCHAR(100) NOT NULL,
     column_name VARCHAR(100) NOT NULL,
     info_type VARCHAR(50) NOT NULL,
@@ -42,9 +43,27 @@ CREATE TABLE classification_rules (
 
 -- Initial rules insertion
 INSERT INTO classification_rules (type_name, regex) VALUES
+-- Personal Information (PII)
+('FIRST_NAME', '(?i)^first[_ ]?name$'),
+('LAST_NAME', '(?i)^last[_ ]?name$'),
+('DATE_OF_BIRTH', '(?i)dob|date[_ ]?of[_ ]?birth|birth[_ ]?date'),
+('GENDER', '(?i)^gender$|^sex$'),
+('SSN', '(?i)(ssn|social[_ ]?security[_ ]?number|national[_ ]?id)'),
+-- Contact Information
 ('EMAIL_ADDRESS', '(?i)email'),
+('PHONE_NUMBER', '(?i)phone|mobile|contact[_ ]?number'),
+('ADDRESS', '(?i)address|street|city|state|zip|postal[_ ]?code|country'),
+-- Authentication / Security Data
 ('USERNAME', '(?i)user(name)?'),
+('PASSWORD', '(?i)password|passcode|pwd'),
+('SECURITY_QUESTION', '(?i)security[_ ]?(question|answer)'),
+('API_KEY', '(?i)(api[_ ]?key|auth[_ ]?token|secret)'),
+-- Financial Information (PCI)
 ('CREDIT_CARD_NUMBER', '(?i)(credit.*card|card.*number)'),
-('FIRST_NAME', '(?i)first.*name'),
-('LAST_NAME', '(?i)last.*name'),
-('IP_ADDRESS', '(?i)ip(_address)?');
+('BANK_ACCOUNT', '(?i)(account[_ ]?number|iban|acct)'),
+('ROUTING_NUMBER', '(?i)routing[_ ]?number'),
+('SWIFT_CODE', '(?i)swift[_ ]?code'),
+-- Technical Identifiers
+('IP_ADDRESS', '(?i)^ip(_address)?$'),
+('MAC_ADDRESS', '(?i)mac[_ ]?address'),
+('HOSTNAME', '(?i)host[_ ]?name');

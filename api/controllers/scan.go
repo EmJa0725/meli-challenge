@@ -36,27 +36,25 @@ func (ctrl *ScanController) ExecuteScan(c *gin.Context) {
 		return
 	}
 
-	if dbName == "" {
-		dbName = "information_schema"
-	}
-
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", username, password, host, port, dbName)
+	// Always connect to information_schema so the service can query any schema on the server.
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/information_schema", username, password, host, port)
 	externalDB, err := sql.Open("mysql", dsn)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error1": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	defer externalDB.Close()
 
-	scanID, err := ctrl.Service.ExecuteScan(dbID, externalDB)
+	// Execute scan; pass dbName (if empty or "information_schema" service will scan all non-system schemas)
+	scanID, err := ctrl.Service.ExecuteScan(dbID, externalDB, dbName)
 	if err != nil {
 		// Ensure scan history is marked as failed even if the error occurred before service updated it
 		_ = ctrl.Service.UpdateScanStatus(scanID, "failed")
-		c.JSON(http.StatusInternalServerError, gin.H{"error2": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"scan_id": scanID})
+	c.JSON(http.StatusCreated, gin.H{"scan_id": scanID})
 }
 
 func (ctrl *ScanController) GetScanResults(c *gin.Context) {
@@ -67,16 +65,16 @@ func (ctrl *ScanController) GetScanResults(c *gin.Context) {
 		return
 	}
 
-	results, err := ctrl.Service.GetScanResults(scanID)
+	dbResult, err := ctrl.Service.GetScanResults(scanID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	if len(results) == 0 {
+	if len(dbResult.Database) == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"message": "no results for this scan"})
 		return
 	}
 
-	c.JSON(http.StatusOK, results)
+	c.JSON(http.StatusOK, dbResult)
 }

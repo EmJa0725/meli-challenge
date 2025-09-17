@@ -47,18 +47,19 @@ func (r *scanRepository) UpdateHistoryStatus(scanID int64, status string) error 
 }
 
 func (r *scanRepository) SaveResult(scanID int64, result models.ScanResult) error {
-	stmt, err := r.conn.Prepare("INSERT INTO scan_results(scan_id, table_name, column_name, info_type) VALUES (?, ?, ?, ?)")
+	// Insert schema_name with the result
+	stmt, err := r.conn.Prepare("INSERT INTO scan_results(scan_id, schema_name, table_name, column_name, info_type) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(scanID, result.TableName, result.ColumnName, result.InfoType)
+	_, err = stmt.Exec(scanID, result.SchemaName, result.TableName, result.ColumnName, result.InfoType)
 	return err
 }
 
 func (r *scanRepository) GetResultsByScanID(scanID int64) ([]models.ScanResult, error) {
-	rows, err := r.conn.Query("SELECT table_name, column_name, info_type FROM scan_results WHERE scan_id = ?", scanID)
+	rows, err := r.conn.Query("SELECT schema_name, table_name, column_name, info_type FROM scan_results WHERE scan_id = ? ORDER BY schema_name, table_name, column_name", scanID)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +68,7 @@ func (r *scanRepository) GetResultsByScanID(scanID int64) ([]models.ScanResult, 
 	var results []models.ScanResult
 	for rows.Next() {
 		var result models.ScanResult
-		if err := rows.Scan(&result.TableName, &result.ColumnName, &result.InfoType); err != nil {
+		if err := rows.Scan(&result.SchemaName, &result.TableName, &result.ColumnName, &result.InfoType); err != nil {
 			return nil, err
 		}
 		results = append(results, result)
