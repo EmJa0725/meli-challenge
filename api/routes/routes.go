@@ -2,6 +2,7 @@ package routes
 
 import (
 	"meli-challenge/api/controllers"
+	"meli-challenge/api/middleware"
 	"meli-challenge/api/repositories"
 	"meli-challenge/api/services"
 	"meli-challenge/config"
@@ -27,7 +28,8 @@ func RegisterRoutes(r *gin.Engine) {
 	controllerScan := controllers.NewScanController(serviceScan, db)
 	controllerRule := controllers.NewRuleController(serviceRule)
 
-	v1 := r.Group("/api/v1")
+	// Apply API key middleware to all v1 routes
+	v1 := r.Group("/api/v1", middleware.APIKeyAuthMiddleware())
 	{
 		v1.GET("/ping", controllers.Ping)
 		v1.POST("/database", controllerDB.CreateDatabase)

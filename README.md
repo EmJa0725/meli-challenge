@@ -34,23 +34,37 @@ docker-compose up --build -d
 
 Una vez levantado, se pueden realizar peticiones a los endpoints según el puerto definido en `.env`. Por ejemplo http://localhost:8000.
 
+## Autenticación por medio de API key
+
+La aplicación soporta un mecanismo sencillo de API key. Es necesario definir la variable `API_KEY` en el archivo `.env`. 
+
+Incluir el header `X-API-Key: <your-key>` en las peticiones a los endpoints protegidos. Si `API_KEY` no está definido, la autenticación se omite (modo desarrollo).
+
+Ejemplo de header:
+
+```
+X-API-Key: mysecretkey
+```
+
 ## Endpoints principales
 
 ### Registrar una base externa
 
 **POST /api/v1/database**
 
-Payload ejemplo:
-```json
-{
-  "host": "meli-challenge-target-db",
-  "port": 3309,
-  "username": "target_user",
-  "password": "target_password"
-}
+```bash
+curl -X POST http://localhost:8000/api/v1/database \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: mysecretkey" \
+  -d '{
+    "host": "meli-challenge-target-db",
+    "port": 3309,
+    "username": "target_user",
+    "password": "target_password"
+  }'
 ```
 
-Respuesta:
+Respuesta esperada:
 ```json
 {
   "id": 1
@@ -61,7 +75,12 @@ Respuesta:
 
 **POST /api/v1/database/scan/:id**
 
-Respuesta:
+```bash
+curl -X POST http://localhost:8000/api/v1/database/scan/1 \
+  -H "X-API-Key: mysecretkey"
+```
+
+Respuesta esperada:
 ```json
 {
   "scan_id": 1
@@ -71,6 +90,11 @@ Respuesta:
 ### Consultar resultados de escaneo
 
 **GET /api/v1/database/scan/:id**
+
+```bash
+curl -X GET http://localhost:8000/api/v1/database/scan/1 \
+  -H "X-API-Key: mysecretkey"
+```
 
 Respuesta ejemplo:
 ```json
