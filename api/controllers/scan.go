@@ -62,6 +62,47 @@ func (ctrl *ScanController) ExecuteScan(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"scan_id": scanID})
 }
 
+// ExecuteScanV2 performs a content-aware scan using OpenAI to classify columns
+// based on sampled values when name-based classification is inconclusive.
+func (ctrl *ScanController) ExecuteScanV2(c *gin.Context) {
+	idParam := c.Param("id")
+	dbID, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database ID"})
+		return
+	}
+
+	// obtain database connection details from internal DB
+	row := ctrl.DB.QueryRow("SELECT host, port, username, password FROM `external_databases` WHERE id = ?", dbID)
+	var host, username, password string
+	var port int
+	if err := row.Scan(&host, &port, &username, &password); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Database not found"})
+		return
+	}
+
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/information_schema", username, password, host, port)
+	externalDB, err := sql.Open("mysql", dsn)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer externalDB.Close()
+
+	logger.Infof("Starting V2 scan for database id=%d host=%s port=%d", dbID, host, port)
+
+	scanID, err := ctrl.Service.ExecuteScanV2(dbID, externalDB)
+	if err != nil {
+		_ = ctrl.Service.UpdateScanStatus(scanID, "failed")
+		logger.Errorf("V2 Scan failed for database id=%d: %v", dbID, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	logger.Infof("V2 Scan completed for database id=%d scan_id=%d", dbID, scanID)
+	c.JSON(http.StatusCreated, gin.H{"scan_id": scanID})
+}
+
 func (ctrl *ScanController) GetScanResults(c *gin.Context) {
 	idParam := c.Param("id")
 	scanID, err := strconv.ParseInt(idParam, 10, 64)

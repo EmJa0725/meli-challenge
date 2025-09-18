@@ -38,4 +38,10 @@ func RegisterRoutes(r *gin.Engine) {
 		v1.POST("/classification/rule", controllerRule.CreateRule)
 		v1.GET("/classification/rules", controllerRule.GetAllRules)
 	}
+
+	// v2 routes (content-aware scans using OpenAI)
+	v2 := r.Group("/api/v2", middleware.APIKeyAuthMiddleware())
+	{
+		v2.POST("/database/scan/:id", controllerScan.ExecuteScanV2)
+	}
 }
