@@ -3,6 +3,7 @@ package controllers
 import (
 	"database/sql"
 	"fmt"
+	"html/template"
 	"meli-challenge/api/services"
 	"meli-challenge/logger"
 	"net/http"
@@ -82,6 +83,142 @@ func (ctrl *ScanController) GetScanResults(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dbResult)
+}
+
+// RenderScanReport returns an HTML report summarizing a scan results with metrics.
+func (ctrl *ScanController) RenderScanReport(c *gin.Context) {
+	idParam := c.Param("id")
+	scanID, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		c.String(http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	dbResult, err := ctrl.Service.GetScanResults(scanID)
+	if err != nil {
+		c.String(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Fetch scan status from internal scan_history
+	var scanStatus string
+	row := ctrl.DB.QueryRow("SELECT status FROM scan_history WHERE id = ?", scanID)
+	if err := row.Scan(&scanStatus); err != nil {
+		// default when not found or error
+		scanStatus = "unknown"
+	}
+
+	// Compute overall counts and per-table breakdown
+	totalCols := 0
+	typeCounts := make(map[string]int)
+	typeOrder := make([]string, 0)
+
+	type tableSummary struct {
+		Schema     string
+		Table      string
+		Total      int
+		TypeCounts map[string]int
+	}
+
+	var tables []tableSummary
+
+	for _, schema := range dbResult.Database {
+		for _, tbl := range schema.SchemaTables {
+			ts := tableSummary{Schema: schema.SchemaName, Table: tbl.TableName, TypeCounts: make(map[string]int)}
+			for _, col := range tbl.Columns {
+				totalCols++
+				ts.Total++
+				ts.TypeCounts[col.InfoType]++
+				if _, ok := typeCounts[col.InfoType]; !ok {
+					typeOrder = append(typeOrder, col.InfoType)
+				}
+				typeCounts[col.InfoType]++
+			}
+			tables = append(tables, ts)
+		}
+	}
+
+	// Build template
+	const tpl = `<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Scan Report {{.ScanID}}</title>
+<style>body{font-family:Arial,Helvetica,sans-serif}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px}th{background:#f2f2f2;text-align:left}</style>
+</head>
+<body>
+	<h1>Scan Report {{.ScanID}}</h1>
+	<p>Scan status: <strong style="color:{{.StatusColor}}">{{.Status}}</strong></p>
+	<p>Total columns scanned: {{.Total}}</p>
+
+	<h2>By Info Type</h2>
+	<table>
+		<tr><th>Info Type</th><th>Count</th><th>Percentage</th></tr>
+		{{range $t, $c := .TypeCounts}}
+		<tr><td>{{$t}}</td><td>{{$c}}</td><td>{{printf "%.2f" (mul (div $c $.Total) 100) }}%</td></tr>
+		{{end}}
+	</table>
+
+	<h2>Per Table</h2>
+	{{range .Tables}}
+		<h3>{{.Schema}}.{{.Table}} ({{.Total}} cols)</h3>
+		<table>
+			<tr><th>Info Type</th><th>Count</th></tr>
+			{{range $k,$v := .TypeCounts}}
+				<tr><td>{{$k}}</td><td>{{$v}}</td></tr>
+			{{end}}
+		</table>
+	{{end}}
+
+</body>
+</html>`
+
+	// prepare template with helper functions
+	funcMap := template.FuncMap{
+		"div": func(a, b int) float64 {
+			if b == 0 {
+				return 0
+			}
+			return float64(a) / float64(b)
+		},
+		"mul": func(a float64, b int) float64 { return a * float64(b) },
+	}
+	t, err := template.New("report").Funcs(funcMap).Parse(tpl)
+	if err != nil {
+		logger.Errorf("template parse error: %v", err)
+		c.String(http.StatusInternalServerError, "template error")
+		return
+	}
+
+	data := struct {
+		ScanID      int64
+		Status      string
+		StatusColor string
+		Total       int
+		TypeCounts  map[string]int
+		Tables      []tableSummary
+	}{
+		ScanID: scanID,
+		Status: scanStatus,
+		StatusColor: func() string {
+			switch scanStatus {
+			case "success":
+				return "green"
+			case "failed":
+				return "red"
+			case "running":
+				return "orange"
+			default:
+				return "gray"
+			}
+		}(),
+		Total:      totalCols,
+		TypeCounts: typeCounts,
+		Tables:     tables,
+	}
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	if err := t.Execute(c.Writer, data); err != nil {
+		logger.Errorf("template execute error: %v", err)
+	}
 }
 
 // ExecuteScanV2 runs column-based + data sampling classification using LLM

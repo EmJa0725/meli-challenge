@@ -4,12 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"meli-challenge/api/classifiers"
 	llm "meli-challenge/api/llm"
 	"meli-challenge/api/models"
 	"meli-challenge/api/repositories"
 	"meli-challenge/logger"
-	"strings"
 )
 
 type ScanService interface {
@@ -206,7 +211,26 @@ func (s *scanService) ExecuteScanV2(databaseID int64, externalDB *sql.DB) (scanI
 
 	// Init OpenAI client once
 	llmClient := llm.NewOpenAIClient()
-	ctx := context.Background()
+
+	// Configurable concurrency/timeout/rate limiting for LLM calls
+	maxConc := 4
+	if v := os.Getenv("LLM_CONCURRENCY"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			maxConc = n
+		}
+	}
+	timeoutMs := 8000
+	if v := os.Getenv("LLM_TIMEOUT_MS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			timeoutMs = n
+		}
+	}
+	ratePerSec := 0
+	if v := os.Getenv("LLM_RATE_PER_SEC"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			ratePerSec = n
+		}
+	}
 
 	// Determine tables to scan
 	tablesRows, err := externalDB.Query(`
@@ -219,6 +243,25 @@ func (s *scanService) ExecuteScanV2(databaseID int64, externalDB *sql.DB) (scanI
 		return scanID, err
 	}
 	defer tablesRows.Close()
+
+	// We'll classify columns concurrently using a semaphore to limit parallel LLM calls.
+	sem := make(chan struct{}, maxConc)
+	var limiter <-chan time.Time
+	var rateTicker *time.Ticker
+	if ratePerSec > 0 {
+		rateTicker = time.NewTicker(time.Second / time.Duration(ratePerSec))
+		limiter = rateTicker.C
+		defer rateTicker.Stop()
+	}
+
+	// Gather columns to process so we can run them concurrently and then persist results.
+	type colWork struct {
+		schema  string
+		table   string
+		column  string
+		samples []string
+	}
+	var workItems []colWork
 
 	for tablesRows.Next() {
 		var schemaName, tableName string
@@ -246,7 +289,7 @@ func (s *scanService) ExecuteScanV2(databaseID int64, externalDB *sql.DB) (scanI
 			}
 
 			// Sample up to 5 values from the column
-			query := fmt.Sprintf("SELECT DISTINCT `%s` FROM `%s`.`%s` LIMIT 5", columnName, schemaName, tableName)
+			query := fmt.Sprintf("SELECT DISTINCT `%s` FROM `%s`.`%s` WHERE `%s` IS NOT NULL LIMIT 5", columnName, schemaName, tableName, columnName)
 			sampleRows, err := externalDB.Query(query)
 			if err != nil {
 				// Some columns may not be selectable (e.g., blob), continue gracefully
@@ -263,29 +306,68 @@ func (s *scanService) ExecuteScanV2(databaseID int64, externalDB *sql.DB) (scanI
 			}
 			sampleRows.Close()
 
-			// Combine samples into a single string (to give context to LLM)
-			sampleText := fmt.Sprintf("Column: %s\nValues: %s", columnName, strings.Join(samples, ", "))
+			workItems = append(workItems, colWork{schema: schemaName, table: tableName, column: columnName, samples: samples})
+		}
+		cols.Close()
+	}
 
-			// Call OpenAI for classification
-			infoType, err := llmClient.ClassifySample(ctx, sampleText, categories)
-			if err != nil {
-				logger.Errorf("LLM classification failed for %s.%s.%s: %v", schemaName, tableName, columnName, err)
-				infoType = "N/A"
+	// Process work items concurrently
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	errs := make([]error, 0)
+
+	for _, wi := range workItems {
+		// capture
+		wi := wi
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// Acquire semaphore slot
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			// Rate limit if configured
+			if limiter != nil {
+				select {
+				case <-limiter:
+				}
 			}
 
-			// Save result once per column
+			// per-call timeout
+			cctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
+			defer cancel()
+
+			sampleText := fmt.Sprintf("Column: %s\nValues: %s", wi.column, strings.Join(wi.samples, ", "))
+			infoType := "N/A"
+			label, err := llmClient.ClassifySample(cctx, sampleText, categories)
+			if err != nil {
+				logger.Warnf("LLM classify failed for %s.%s.%s: %v", wi.schema, wi.table, wi.column, err)
+				mu.Lock()
+				errs = append(errs, err)
+				mu.Unlock()
+			} else if label != "" {
+				infoType = label
+			}
+
 			result := models.ScanResult{
-				SchemaName: schemaName,
-				TableName:  tableName,
-				ColumnName: columnName,
+				SchemaName: wi.schema,
+				TableName:  wi.table,
+				ColumnName: wi.column,
 				InfoType:   infoType,
 			}
 			if err := s.repoScan.SaveResult(scanID, result); err != nil {
 				logger.Errorf("SaveResult exec failed for scanID=%d: %v", scanID, err)
-				return scanID, err
+				mu.Lock()
+				errs = append(errs, err)
+				mu.Unlock()
 			}
-		}
-		cols.Close()
+		}()
+	}
+	wg.Wait()
+
+	if len(errs) > 0 {
+		// return first error but keep results persisted
+		return scanID, errs[0]
 	}
 
 	return scanID, nil

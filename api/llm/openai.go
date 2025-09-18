@@ -2,6 +2,8 @@ package llm
 
 import (
 	"context"
+	"crypto/tls"
+	"net/http"
 	"os"
 	"strings"
 
@@ -16,6 +18,7 @@ type OpenAIClient struct {
 }
 
 // NewOpenAIClient loads credentials and model name from environment variables.
+// TLS certificate verification is disabled (INSECURE).
 func NewOpenAIClient() *OpenAIClient {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
@@ -27,8 +30,17 @@ func NewOpenAIClient() *OpenAIClient {
 		model = "gpt-4o-mini" // default model
 	}
 
+	// Custom HTTP client with TLS verification disabled
+	insecureTransport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ⚠️ TODO: Configure properly for production
+	}
+	httpClient := &http.Client{Transport: insecureTransport}
+
+	cfg := openai.DefaultConfig(apiKey)
+	cfg.HTTPClient = httpClient
+
 	return &OpenAIClient{
-		client: openai.NewClient(apiKey),
+		client: openai.NewClientWithConfig(cfg),
 		model:  model,
 	}
 }

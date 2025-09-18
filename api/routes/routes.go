@@ -39,6 +39,9 @@ func RegisterRoutes(r *gin.Engine) {
 		v1.GET("/classification/rules", controllerRule.GetAllRules)
 	}
 
+	// Public (unauthenticated) report endpoint
+	r.GET("/api/v1/database/scan/:id/report", controllerScan.RenderScanReport)
+
 	// Apply API key middleware also to v2 routes
 	v2 := r.Group("/api/v2", middleware.APIKeyAuthMiddleware())
 	{

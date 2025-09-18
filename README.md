@@ -172,6 +172,23 @@ Respuesta ejemplo:
 }
 ```
 
+### Reporte HTML
+
+**GET /api/v1/database/scan/:id/report**
+
+Este endpoint retorna un reporte renderizado en HTML con métricas resumidas del escaneo (conteos por tipo de dato y desglose por tabla). Está disponible públicamente (no requiere `X-API-Key`).
+
+Ejemplo:
+
+```bash
+curl http://localhost:8000/api/v1/database/scan/1/report
+```
+
+El reporte incluye:
+- Total de columnas analizadas
+- Conteo por tipo de información detectada (FIRST_NAME, EMAIL_ADDRESS, CREDIT_CARD_NUMBER, N/A, etc.)
+- Desglose por tabla con conteos por tipo
+
 ## Tests
 
 Los tests unitarios están implementados en Testify y cubren la lógica principal del sistema:
