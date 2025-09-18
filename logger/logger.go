@@ -4,6 +4,8 @@ import (
 	"log"
 	"os"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 type Level int
@@ -19,7 +21,12 @@ var level = INFO
 var std = log.New(os.Stdout, "", log.LstdFlags|log.Lmicroseconds)
 
 func init() {
+	// Attempt to load .env so LOG_LEVEL set in the project .env is available
+	_ = godotenv.Load()
+
 	l := strings.ToUpper(os.Getenv("LOG_LEVEL"))
+	// print log level
+	log.Printf("Log level set to: %s", l)
 	switch l {
 	case "DEBUG":
 		level = DEBUG

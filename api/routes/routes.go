@@ -38,4 +38,10 @@ func RegisterRoutes(r *gin.Engine) {
 		v1.POST("/classification/rule", controllerRule.CreateRule)
 		v1.GET("/classification/rules", controllerRule.GetAllRules)
 	}
+
+	// Apply API key middleware also to v2 routes
+	v2 := r.Group("/api/v2", middleware.APIKeyAuthMiddleware())
+	{
+		v2.POST("/database/scan/:id", controllerScan.ExecuteScanV2)
+	}
 }

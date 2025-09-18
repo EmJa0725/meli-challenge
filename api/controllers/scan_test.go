@@ -20,6 +20,10 @@ func (d *DummyScanService) ExecuteScan(databaseID int64, externalDB *sql.DB) (in
 	return 123, nil
 }
 
+func (d *DummyScanService) ExecuteScanV2(databaseID int64, externalDB *sql.DB) (int64, error) {
+	return 123, nil
+}
+
 func (d *DummyScanService) GetScanResults(scanID int64) (models.DatabaseResult, error) {
 	return models.DatabaseResult{
 		Database: []models.SchemaView{

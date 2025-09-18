@@ -87,6 +87,32 @@ Respuesta esperada:
 }
 ```
 
+### Lanzar escaneo avanzado (v2, con muestreo y API OpenAI)
+
+
+**POST /api/v2/database/scan/:id**
+
+Este endpoint realiza un escaneo avanzado: toma hasta 5 muestras de datos por columna junto a su nombre y utiliza un modelo LLM (OpenAI) para clasificar el contenido. Es útil para detectar datos sensibles que no se identifican solo por el nombre de la columna.
+
+Requiere definir la variable `OPENAI_API_KEY` en el archivo `.env`.
+
+```bash
+curl -X POST http://localhost:8000/api/v2/database/scan/1 \
+  -H "X-API-Key: mysecretkey"
+```
+
+Respuesta esperada:
+```json
+{
+  "scan_id": 2
+}
+```
+
+Notas:
+- El escaneo v2 puede generar costos por uso de la API de OpenAI.
+- El modelo usado se configura con `LLM_MODEL` (por defecto: gpt-4o-mini).
+- El log de la aplicación (nivel DEBUG) muestra el prompt enviado y la respuesta del LLM para cada columna muestreada.
+
 ### Consultar resultados de escaneo
 
 **GET /api/v1/database/scan/:id**
