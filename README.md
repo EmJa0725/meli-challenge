@@ -1,10 +1,11 @@
-# Meli Challenge: Clasificador de datos sensibles en bases de datos MySQL
+# Meli Challenge: Clasificador de bases de datos MySQL tipo DLP
 
-Este repositorio contiene una solución para la prueba técnica "Clasificación de base de datos". La aplicación explora instancias MySQL externas, recorre esquemas y tablas, clasifica columnas según reglas configurables (regex) y persiste resultados y un historial de ejecuciones.
+Este repositorio implementa la solución al challenge "Clasificación de base de datos".
+La aplicación se conecta a instancias externas de MySQL, recorre esquemas y tablas, y clasifica las columnas según reglas configurables basadas en expresiones regulares almacenadas en la base de datos interna.
 
-# Solución: Clasificación de base de datos
+Además, incorpora un modo avanzado que mejora la detección de datos sensibles: realiza un muestreo de registros y utiliza un LLM para clasificar columnas según su contenido cuando la identificación por nombre no resulta concluyente.
 
-Esta solución explora instancias MySQL externas, recorre esquemas y tablas, y clasifica columnas según reglas configurables (regex) almacenadas en la base de datos. Los resultados y el historial de ejecuciones se persisten para trazabilidad y auditoría.
+Los resultados y el historial de ejecuciones se persisten para asegurar trazabilidad, auditoría y generación de reportes.
 
 ## Diseño
 
